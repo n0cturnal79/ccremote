@@ -55,11 +55,13 @@ export class Monitor extends EventEmitter {
 		// Task completion patterns - detect when Claude is waiting for input
 		taskCompletion: {
 			// Claude is ready for new input (command prompt visible)
-			waitingForInput: /^>\s*$/m,
+			// Matches lines starting with > (the Claude Code input prompt)
+			// Also matches the ↵ send indicator that appears at end of prompt line
+			waitingForInput: /^>.*↵\s*send|^>\s*$/m,
 			// Claude finished processing and showing results
 			taskFinished: /(?:completed|finished|done|ready)/i,
-			// No active processing indicators
-			notProcessing: /^(?!.*(?:processing|analyzing|running|executing|working)).*$/im,
+			// No active processing indicators (spinners, progress, etc.)
+			notProcessing: /^(?!.*(?:◐|◑|◒|◓|⠋|⠙|⠹|⠸|processing|analyzing|running|executing|working|loading)).*$/im,
 		},
 	};
 

@@ -21,9 +21,13 @@ export const startCommand = define({
 			type: 'string',
 			description: 'Discord channel ID (optional)',
 		},
+		'use-existing': {
+			type: 'string',
+			description: 'Use existing tmux session instead of creating new one',
+		},
 	},
 	async run(ctx) {
-		const { name, channel } = ctx.values;
+		const { name, channel, 'use-existing': useExisting } = ctx.values;
 		consola.start('Starting ccremote session...');
 
 		// Load and validate configuration
@@ -179,15 +183,29 @@ export const startCommand = define({
 
 			consola.success(`Created session: ${session.name} (${session.id})`);
 
-			// Check if tmux session already exists (cleanup from previous run)
-			if (await tmuxManager.sessionExists(session.tmuxSession)) {
-				consola.info(`Tmux session ${session.tmuxSession} already exists, killing it...`);
-				await tmuxManager.killSession(session.tmuxSession);
+			// Handle existing tmux session or create new one
+			if (useExisting) {
+				// Use existing tmux session - verify it exists
+				if (!(await tmuxManager.sessionExists(useExisting))) {
+					consola.error(`Tmux session '${useExisting}' does not exist`);
+					process.exit(1);
+				}
+				consola.info(`Using existing tmux session: ${useExisting}`);
+				// Override the tmux session name to use the existing one
+				session.tmuxSession = useExisting;
+				await sessionManager.updateSession(session.id, { tmuxSession: useExisting });
 			}
+			else {
+				// Check if tmux session already exists (cleanup from previous run)
+				if (await tmuxManager.sessionExists(session.tmuxSession)) {
+					consola.info(`Tmux session ${session.tmuxSession} already exists, killing it...`);
+					await tmuxManager.killSession(session.tmuxSession);
+				}
 
-			// Create tmux session with Claude Code
-			consola.info('Creating tmux session and starting Claude Code...');
-			await tmuxManager.createSession(session.tmuxSession);
+				// Create tmux session with Claude Code
+				consola.info('Creating tmux session and starting Claude Code...');
+				await tmuxManager.createSession(session.tmuxSession);
+			}
 
 			// Prepare daemon configuration
 			const daemonConfig: DaemonConfig = {
@@ -231,6 +249,16 @@ export const startCommand = define({
 					process.exit(0);
 				})();
 			});
+
+			// Skip auto-attach if using existing session (user is likely already attached)
+			if (useExisting) {
+				consola.info('');
+				consola.info('✅ Daemon monitoring started for existing session');
+				consola.info(`   Tmux session: ${session.tmuxSession}`);
+				consola.info(`   Stop monitoring: ccremote stop --session ${session.id}`);
+				consola.info(`   View logs: tail -f ${logFile}`);
+				process.exit(0);
+			}
 
 			// Give user a moment to read the info, then attach
 			consola.info('🔄 Attaching to Claude Code session in 5 seconds...');

@@ -35,7 +35,9 @@ export class TmuxManager {
 			}
 
 			// Start Claude in the session
-			const startClaudeCommand = `tmux send-keys -t "${sessionName}" "claude" Enter`;
+			// Support custom Claude command via CCREMOTE_CLAUDE_COMMAND env var
+			const claudeCommand = process.env.CCREMOTE_CLAUDE_COMMAND || 'claude';
+			const startClaudeCommand = `tmux send-keys -t "${sessionName}" "${claudeCommand}" Enter`;
 			await execAsync(startClaudeCommand);
 		}
 		catch (error) {
